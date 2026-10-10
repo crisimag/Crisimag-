@@ -14,9 +14,9 @@ jobs:
       - name: Clonar repositorio
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Necesario para obtener historial de commits
+          fetch-depth: 0
 
-      - name: Generar lista.json con fechas
+      - name: Generar lista.json con fecha y hora
         run: |
           python3 << 'EOF'
           import os
@@ -34,25 +34,29 @@ jobs:
                       ruta_completa = os.path.join(root, f)
                       ruta_relativa = os.path.relpath(ruta_completa, carpeta)
                       
-                      # Obtener fecha del último commit de este archivo
+                      # Obtener fecha y hora del último commit (formato ISO 8601)
                       try:
                           result = subprocess.run(
                               ['git', 'log', '-1', '--format=%ci', '--', ruta_completa],
                               capture_output=True, text=True, check=True
                           )
                           fecha_commit = result.stdout.strip()
-                          # Formato: "2026-10-10 14:30:00 +0000" → extraer solo YYYY-MM-DD
-                          fecha_dia = fecha_commit.split(' ')[0] if fecha_commit else 'sin-fecha'
+                          # "2026-10-10 14:30:22 +0000" → "2026-10-10T14:30:22"
+                          if fecha_commit:
+                              partes = fecha_commit.split(' ')
+                              fecha_hora = f"{partes[0]}T{partes[1]}"
+                          else:
+                              fecha_hora = 'sin-fecha'
                       except:
-                          fecha_dia = 'sin-fecha'
+                          fecha_hora = 'sin-fecha'
                       
                       archivos.append({
                           'name': ruta_relativa,
-                          'date': fecha_dia
+                          'date': fecha_hora
                       })
 
-          # Ordenar: primero por fecha (más reciente), luego por nombre
-          archivos.sort(key=lambda x: (x['date'], x['name']), reverse=True)
+          # Ordenar por fecha+hora (más reciente primero)
+          archivos.sort(key=lambda x: x['date'], reverse=True)
 
           with open(os.path.join(carpeta, 'lista.json'), 'w', encoding='utf-8') as out:
               json.dump(archivos, out, indent=2, ensure_ascii=False)
@@ -65,5 +69,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Carpeta/lista.json
-          git diff --staged --quiet || git commit -m " Auto-generar lista.json con fechas"
+          git diff --staged --quiet || git commit -m " Auto-generar lista.json con fecha y hora"
           git push
