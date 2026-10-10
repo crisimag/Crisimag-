@@ -1,0 +1,46 @@
+name: Generar lista.json automático
+
+on:
+  push:
+    paths:
+      - 'Carpeta/**'
+
+jobs:
+  generar-lista:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: Generar lista.json
+        run: |
+          # Buscar archivos multimedia en la carpeta
+          archivos=$(find Carpeta -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.mp4" -o -iname "*.mov" -o -iname "*.webm" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.heic" -o -iname "*.heif" -o -iname "*.avif" \) | sort -r)
+          
+          # Crear el JSON
+          echo "[" > Carpeta/lista.json
+          primero=true
+          for archivo in $archivos; do
+            # Quitar la ruta "Carpeta/" y dejar solo el nombre
+            nombre="${archivo#Carpeta/}"
+            # Ignorar el propio lista.json
+            if [ "$nombre" != "lista.json" ]; then
+              if [ "$primero" = true ]; then
+                primero=false
+              else
+                echo "," >> Carpeta/lista.json
+              fi
+              echo "  \"$nombre\"" >> Carpeta/lista.json
+            fi
+          done
+          echo "]" >> Carpeta/lista.json
+
+      - name: Subir lista.json actualizado
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Carpeta/lista.json
+          git diff --staged --quiet || git commit -m " Auto-generar lista.json"
+          git push
