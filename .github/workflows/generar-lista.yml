@@ -14,33 +14,38 @@ jobs:
       - name: Clonar repositorio
         uses: actions/checkout@v4
 
-      - name: Generar lista.json
+      - name: Generar lista.json con Python
         run: |
-          # Buscar archivos multimedia en la carpeta
-          archivos=$(find Carpeta -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.mp4" -o -iname "*.mov" -o -iname "*.webm" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.heic" -o -iname "*.heif" -o -iname "*.avif" \) | sort -r)
-          
-          # Crear el JSON
-          echo "[" > Carpeta/lista.json
-          primero=true
-          for archivo in $archivos; do
-            # Quitar la ruta "Carpeta/" y dejar solo el nombre
-            nombre="${archivo#Carpeta/}"
-            # Ignorar el propio lista.json
-            if [ "$nombre" != "lista.json" ]; then
-              if [ "$primero" = true ]; then
-                primero=false
-              else
-                echo "," >> Carpeta/lista.json
-              fi
-              echo "  \"$nombre\"" >> Carpeta/lista.json
-            fi
-          done
-          echo "]" >> Carpeta/lista.json
+          python3 << 'EOF'
+          import os
+          import json
+
+          carpeta = "Carpeta"
+          extensiones = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.webm', '.mkv', '.avi', '.heic', '.heif', '.avif'}
+
+          archivos = []
+          for root, dirs, files in os.walk(carpeta):
+              for f in files:
+                  ext = os.path.splitext(f)[1].lower()
+                  if ext in extensiones and f != 'lista.json':
+                      # Ruta relativa desde "Carpeta/"
+                      ruta_completa = os.path.join(root, f)
+                      ruta_relativa = os.path.relpath(ruta_completa, carpeta)
+                      archivos.append(ruta_relativa)
+
+          # Ordenar alfabéticamente inverso (más reciente primero si usas fechas)
+          archivos.sort(reverse=True)
+
+          with open(os.path.join(carpeta, 'lista.json'), 'w', encoding='utf-8') as out:
+              json.dump(archivos, out, indent=2, ensure_ascii=False)
+
+          print(f"✅ lista.json generado con {len(archivos)} archivos")
+          EOF
 
       - name: Subir lista.json actualizado
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Carpeta/lista.json
-          git diff --staged --quiet || git commit -m " Auto-generar lista.json"
+          git diff --staged --quiet || git commit -m "🤖 Auto-generar lista.json"
           git push
